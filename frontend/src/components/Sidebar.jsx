@@ -233,17 +233,16 @@ const Sidebar = () => {
                       {/* Room avatar or initials */}
                       <div className="relative">
                         {room.avatar ? (
-                          <img src={room.avatar} alt="avatar" className="size-8 lg:size-10 object-cover rounded-full border border-base-300" />
+                          <img src={room.avatar} alt="avatar" className="size-12 object-cover rounded-full border border-base-300" />
                         ) : (
-                          <span className="size-8 lg:size-10 rounded-full bg-base-300 flex items-center justify-center text-base-content/70 text-lg lg:text-xl font-bold uppercase">
+                          <span className="size-12 rounded-full bg-base-300 flex items-center justify-center text-base-content/70 text-xl font-bold uppercase border border-base-300">
                             {room.name?.replace(/[^a-zA-Z0-9]/g, '').slice(0,2) || 'GC'}
                           </span>
                         )}
                       </div>
-                      {/* Room name */}
-                      <div className="min-w-0 flex-1 text-left">
+                      {/* Room name - hidden on small screens, visible on lg+ */}
+                      <div className="min-w-0 flex-1 text-left hidden lg:block">
                         <div className="font-medium truncate text-base-content text-xs lg:text-sm">{room.name}</div>
-                        {/* Removed member count for cleaner UI, only show in header */}
                       </div>
                     </button>
                   </div>
