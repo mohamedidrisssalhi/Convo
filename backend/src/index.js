@@ -8,14 +8,14 @@ import path from "path";
 import { connectDB } from "./lib/db.js";
 
 import authRoutes from "./routes/auth.route.js";
-import expressApp from "express";
+import messageRoutes from "./routes/message.route.js";
+import chatRoomRoutes from "./routes/chatRoom.route.js";
+import { app, server } from "./lib/socket.js";
 
 dotenv.config();
 
-
 const PORT = process.env.PORT;
 const __dirname = path.resolve();
-const app = expressApp();
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -27,8 +27,9 @@ app.use(
   })
 );
 
-
 app.use("/api/auth", authRoutes);
+app.use("/api/messages", messageRoutes);
+app.use("/api/chatrooms", chatRoomRoutes);
 
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
@@ -38,8 +39,7 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log("server is running on PORT:" + PORT);
   connectDB();
 });
