@@ -1,3 +1,6 @@
+
+// List of available themes for the chat app UI.
+// Used for theme selection and switching in the app.
 export const THEMES = [
   "light",
   "dark",

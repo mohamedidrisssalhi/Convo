@@ -11,7 +11,7 @@ export const useAuthStore = create((set, get) => ({
   isLoggingIn: false,
   isUpdatingProfile: false,
   isCheckingAuth: true,
-  // onlineUsers removed for Phase 3
+  onlineUsers: [],
   socket: null,
 
   checkAuth: async () => {
@@ -68,18 +68,38 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-
+  updateProfile: async (data) => {
+    set({ isUpdatingProfile: true });
+    try {
+      const res = await axiosInstance.put("/auth/update-profile", data);
+      set({ authUser: res.data });
+      toast.success("Profile updated successfully");
+    } catch (error) {
+      console.log("error in update profile:", error);
+      toast.error(error.response.data.message);
+    } finally {
+      set({ isUpdatingProfile: false });
+    }
+  },
 
   connectSocket: () => {
     const { authUser } = get();
     if (!authUser || get().socket?.connected) return;
-    const { socket } = require("../lib/socket");
-    socket.auth = { userId: authUser._id };
+
+    const socket = io(BASE_URL, {
+      query: {
+        userId: authUser._id,
+      },
+    });
     socket.connect();
-    set({ socket });
+
+    set({ socket: socket });
+
+    socket.on("getOnlineUsers", (userIds) => {
+      set({ onlineUsers: userIds });
+    });
   },
   disconnectSocket: () => {
     if (get().socket?.connected) get().socket.disconnect();
-    set({ socket: null });
   },
 }));

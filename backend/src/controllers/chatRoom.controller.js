@@ -10,7 +10,6 @@
 
 import ChatRoom from '../models/chatRoom.model.js';
 import User from '../models/user.model.js';
-import { io } from '../lib/socket.js';
 
 // Controller to create a new chat room
 // - Validates input, checks for duplicate room, and creates the room document
@@ -65,9 +64,6 @@ const joinRoom = async (req, res) => {
     }
     // Respond with the updated room
     res.json(room);
-    // Emit real-time update to room
-    const populatedRoom = await ChatRoom.findById(roomId).populate('members', 'username');
-    io.to(roomId).emit('room-members-updated', populatedRoom ? populatedRoom.members : []);
   } catch (err) {
     // Handle server errors
     res.status(500).json({ message: err.message });
@@ -88,9 +84,6 @@ const leaveRoom = async (req, res) => {
     await room.save();
     // Respond with confirmation
     res.json({ message: 'Left room' });
-    // Emit real-time update to room
-    const populatedRoom = await ChatRoom.findById(roomId).populate('members', 'username');
-    io.to(roomId).emit('room-members-updated', populatedRoom ? populatedRoom.members : []);
   } catch (err) {
     // Handle server errors
     res.status(500).json({ message: err.message });

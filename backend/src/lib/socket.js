@@ -21,12 +21,14 @@ const userSocketMap = {}; // {userId: socketId}
 // used to store room membership: {roomId: Set(socketId)}
 const roomSocketMap = {};
 
+
 io.on("connection", (socket) => {
   console.log("A user connected", socket.id);
 
   const userId = socket.handshake.query.userId;
   if (userId) userSocketMap[userId] = socket.id;
 
+  // io.emit() is used to send events to all the connected clients
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
   // Join a room for real-time updates
@@ -36,7 +38,7 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     // Fetch members from DB and emit
     const { default: ChatRoom } = await import("../models/chatRoom.model.js");
-    const room = await ChatRoom.findById(roomId).populate("members", "username");
+    const room = await ChatRoom.findById(roomId).populate("members", "_id fullName profilePic");
     io.to(roomId).emit("room-members-updated", room ? room.members : []);
   });
 
@@ -46,7 +48,7 @@ io.on("connection", (socket) => {
     socket.leave(roomId);
     // Fetch members from DB and emit
     const { default: ChatRoom } = await import("../models/chatRoom.model.js");
-    const room = await ChatRoom.findById(roomId).populate("members", "username");
+    const room = await ChatRoom.findById(roomId).populate("members", "_id fullName profilePic");
     io.to(roomId).emit("room-members-updated", room ? room.members : []);
   });
 
@@ -59,7 +61,7 @@ io.on("connection", (socket) => {
       roomSocketMap[roomId].delete(socket.id);
       // Optionally emit updated members
       const { default: ChatRoom } = await import("../models/chatRoom.model.js");
-      const room = await ChatRoom.findById(roomId).populate("members", "username");
+      const room = await ChatRoom.findById(roomId).populate("members", "_id fullName profilePic");
       io.to(roomId).emit("room-members-updated", room ? room.members : []);
     }
   });
