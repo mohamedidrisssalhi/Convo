@@ -3,16 +3,6 @@
 # Convo Chat App
 An instant messaging and social platform which allows communication through text messaging and media.
 
----
-
-## 👨‍💻 Credits
-
-**Developed by:** [Mohamed Idriss Salhi](https://github.com/mohamedidrisssalhi)
-
-*building a modern, real-time chat experience.*
-
----
-
 ## Project Planning
 this is how i planned and designed in preps
 
