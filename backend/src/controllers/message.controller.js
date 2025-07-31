@@ -12,6 +12,16 @@ const getRoomMessages = async (req, res) => {
     if (!room) return res.status(404).json({ error: "Room not found" });
     if (!room.members.includes(req.user._id)) return res.status(403).json({ error: "Not a member of this room" });
     const messages = await Message.find({ roomId }).sort({ createdAt: 1 });
+    // Reset unread count for this user in this room
+    if (room && room.unreadCounts) {
+      room.unreadCounts.set(req.user._id.toString(), 0);
+      await room.save();
+      // Emit sidebar update to self so badge disappears instantly (Messenger-style)
+      const mySocketId = getReceiverSocketId(req.user._id.toString());
+      if (mySocketId) {
+        io.to(mySocketId).emit("sidebarUpdate");
+      }
+    }
     res.status(200).json(messages);
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
@@ -39,23 +49,27 @@ const sendRoomMessage = async (req, res) => {
       image: imageUrl,
     });
     await newMessage.save();
-    if (room && room.members && room.members.length > 0) {
-      room.members.forEach((memberId) => {
-        if (memberId.toString() !== senderId.toString()) {
-          const socketId = getReceiverSocketId(memberId.toString());
-          if (socketId) {
-// message.controller.js
-// Handles message creation, retrieval, and message history logic for both room and user-to-user chats.
-//
-// Used in:
-//   - Phase 4: Real-time messaging and message history
-//
-// Exports controller functions for use in message.route.js.
-            io.to(socketId).emit("newMessage", newMessage);
-          }
+    // Update lastMessageAt and unreadCounts
+    room.lastMessageAt = new Date();
+    room.members.forEach((memberId) => {
+      if (memberId.toString() !== senderId.toString()) {
+        // Increment unread count for each recipient
+        const prev = room.unreadCounts.get(memberId.toString()) || 0;
+        room.unreadCounts.set(memberId.toString(), prev + 1);
+        const socketId = getReceiverSocketId(memberId.toString());
+        if (socketId) {
+          io.to(socketId).emit("newMessage", newMessage);
+          // Emit sidebar update to recipient
+          io.to(socketId).emit("sidebarUpdate");
         }
-      });
+      }
+    });
+    // Also emit sidebar update to sender
+    const senderSocketId = getReceiverSocketId(senderId.toString());
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("sidebarUpdate");
     }
+    await room.save();
     res.status(201).json(newMessage);
   } catch (error) {
     res.status(500).json({ error: "Internal server error" });
@@ -63,11 +77,36 @@ const sendRoomMessage = async (req, res) => {
 };
 
 // Get users for sidebar
+// Get users for sidebar, including DM metadata (lastMessageAt, unreadCounts from logged-in user's perspective)
 const getUsersForSidebar = async (req, res) => {
   try {
-    const loggedInUserId = req.user._id;
-    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
-    res.status(200).json(filteredUsers);
+    const loggedInUserId = req.user._id.toString();
+    // Get all users except self
+    const users = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+    // For each user, get lastMessageAt and unreadCounts for this DM
+    const result = await Promise.all(users.map(async (user) => {
+      // Find the latest message between loggedInUser and this user
+      const lastMsg = await Message.findOne({
+        $or: [
+          { senderId: loggedInUserId, receiverId: user._id },
+          { senderId: user._id, receiverId: loggedInUserId },
+        ],
+      }).sort({ createdAt: -1 });
+      // Get unread count for this DM (from logged-in user's unreadCounts)
+      const me = await User.findById(loggedInUserId);
+      let unreadCount = 0;
+      if (me && me.unreadCounts && me.unreadCounts.get(user._id.toString())) {
+        unreadCount = me.unreadCounts.get(user._id.toString());
+      }
+      return {
+        ...user.toObject(),
+        lastMessageAt: lastMsg ? lastMsg.createdAt : null,
+        unreadCount,
+      };
+    }));
+    // Sort by lastMessageAt desc
+    result.sort((a, b) => new Date(b.lastMessageAt || 0) - new Date(a.lastMessageAt || 0));
+    res.status(200).json(result);
   } catch (error) {
     console.error("Error in getUsersForSidebar: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -85,6 +124,17 @@ const getMessages = async (req, res) => {
         { senderId: userToChatId, receiverId: myId },
       ],
     });
+    // Reset unread count for this DM
+    const me = await User.findById(myId);
+    if (me && me.unreadCounts) {
+      me.unreadCounts.set(userToChatId, 0);
+      await me.save();
+      // Emit sidebar update to self so badge disappears instantly
+      const mySocketId = getReceiverSocketId(myId.toString());
+      if (mySocketId) {
+        io.to(mySocketId).emit("sidebarUpdate");
+      }
+    }
     res.status(200).json(messages);
   } catch (error) {
     console.log("Error in getMessages controller: ", error.message);
@@ -110,9 +160,27 @@ const sendMessage = async (req, res) => {
       image: imageUrl,
     });
     await newMessage.save();
+    // Update lastMessageAt and unreadCounts for both users
+    const sender = await User.findById(senderId);
+    const receiver = await User.findById(receiverId);
+    if (sender) sender.lastMessageAt = new Date();
+    if (receiver) receiver.lastMessageAt = new Date();
+    // Increment unread for receiver
+    if (receiver) {
+      const prev = receiver.unreadCounts.get(senderId.toString()) || 0;
+      receiver.unreadCounts.set(senderId.toString(), prev + 1);
+      await receiver.save();
+    }
+    if (sender) await sender.save();
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("newMessage", newMessage);
+      io.to(receiverSocketId).emit("sidebarUpdate");
+    }
+    // Also emit sidebar update to sender
+    const senderSocketId = getReceiverSocketId(senderId.toString());
+    if (senderSocketId) {
+      io.to(senderSocketId).emit("sidebarUpdate");
     }
     res.status(201).json(newMessage);
   } catch (error) {

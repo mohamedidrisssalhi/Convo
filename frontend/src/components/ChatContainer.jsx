@@ -1,58 +1,71 @@
 
 // Main chat container component: displays messages, header, and input for the selected chat
 import { useChatStore } from "../store/useChatStore";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
+import React from "react";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
 
 
+// ErrorBoundary for catching render errors in any child
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, errorInfo) {
+    // Log error to console for debugging
+    console.error("[ErrorBoundary]", error, errorInfo);
+  }
+  render() {
+    if (this.state.error) {
+      return <div className="text-red-500 p-8 text-center">Error: {this.state.error.message || this.state.error.toString()}</div>;
+    }
+    return this.props.children;
+  }
+}
+
 const ChatContainer = () => {
   // Zustand chat store state and actions
   const {
-    messages,                // Array of chat messages for the current chat
-    getMessages,             // Function to fetch messages for a user or room
-    isMessagesLoading,       // Loading state for messages
-    selectedUser,            // Currently selected user (for 1-1 chat)
-    selectedRoom,            // Currently selected room (for group chat)
-    subscribeToMessages,     // Subscribe to real-time message events
-    unsubscribeFromMessages, // Unsubscribe from real-time events
-    chatRooms,               // List of all chat rooms
-    users,                   // List of all users
+    messages,
+    getMessages,
+    isMessagesLoading,
+    selectedUser,
+    selectedRoom,
+    users,
   } = useChatStore();
+
+  // Debug: log Zustand state on every render
+  useEffect(() => {
+    console.log("[DEBUG Zustand]", {
+      messages,
+      selectedUser,
+      selectedRoom,
+      users,
+    });
+  }, [messages, selectedUser, selectedRoom, users]);
   const { authUser } = useAuthStore(); // Authenticated user info
   const messageEndRef = useRef(null);  // Ref for auto-scrolling to latest message
 
-  // Fetch messages and subscribe to real-time updates when chat changes
+  // Fetch messages only on initial chat/room select (socket keeps them live after)
   useEffect(() => {
     if (selectedRoom) {
       getMessages(selectedRoom._id, "room");
     } else if (selectedUser) {
       getMessages(selectedUser._id, "user");
     }
-    subscribeToMessages();
-    return () => unsubscribeFromMessages();
-  }, [selectedUser, selectedRoom, getMessages, subscribeToMessages, unsubscribeFromMessages]);
+    // After initial load, all updates are socket-driven (see useChatStore.js)
+  }, [selectedUser, selectedRoom]);
 
-  // Auto-scroll to the latest message when messages change
-  useEffect(() => {
-    if (messageEndRef.current && messages) {
-      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
-  // Show loading skeleton while messages are loading
-  if (isMessagesLoading) {
-    return (
-      <div className="flex-1 flex flex-col overflow-auto">
-        <ChatHeader />
-        <MessageSkeleton />
-        <MessageInput />
-      </div>
-    );
-  }
+  // Always treat messages as an array
+  const safeMessages = Array.isArray(messages) ? messages : [];
 
   // Helper: Get sender avatar and name for each message
   // For room chat, use sender info from users list; for user chat, use selectedUser/authUser
@@ -60,37 +73,32 @@ const ChatContainer = () => {
     if (selectedRoom) {
       const sender = users.find((u) => u._id === message.senderId) || authUser;
       return {
-        avatar: sender.profilePic || "/avatar.png",
-        name: sender.fullName || "User",
+        avatar: sender && sender.profilePic ? sender.profilePic : "/avatar.png",
+        name: sender && sender.fullName ? sender.fullName : "User",
       };
     } else {
       return {
         avatar:
-          message.senderId === authUser._id
-            ? authUser.profilePic || "/avatar.png"
-            : selectedUser.profilePic || "/avatar.png",
+          authUser && message.senderId === authUser._id
+            ? (authUser.profilePic || "/avatar.png")
+            : (selectedUser && selectedUser.profilePic) || "/avatar.png",
         name:
-          message.senderId === authUser._id
-            ? authUser.fullName || "You"
-            : selectedUser.fullName || "User",
+          authUser && message.senderId === authUser._id
+            ? (authUser.fullName || "You")
+            : (selectedUser && selectedUser.fullName) || "User",
       };
     }
   };
 
-  // Main chat UI layout
-  return (
-    <div className="flex-1 flex flex-col overflow-auto">
-      {/* Chat header with room/user info and close/leave buttons */}
-      <ChatHeader />
-
-      {/* Message list */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => {
+  // Memoize message rendering for performance
+  const renderedMessages = useMemo(() =>
+    safeMessages.length > 0
+      ? safeMessages.map((message) => {
           const senderInfo = getSenderInfo(message);
           return (
             <div
               key={message._id}
-              className={`chat ${message.senderId === authUser._id ? "chat-end" : "chat-start"}`}
+              className={`chat ${authUser && message.senderId === authUser._id ? "chat-end" : "chat-start"}`}
               ref={messageEndRef}
             >
               {/* Sender avatar */}
@@ -122,12 +130,53 @@ const ChatContainer = () => {
               </div>
             </div>
           );
-        })}
-      </div>
+        })
+      : <div className="text-center text-zinc-400 py-8">No messages yet. Start the conversation!</div>
+  , [safeMessages, authUser, users, selectedRoom, selectedUser]);
 
-      {/* Message input box */}
-      <MessageInput />
-    </div>
+  // Auto-scroll to the latest message when messages change, with robust error handling
+  useEffect(() => {
+    try {
+      if (messageEndRef.current && Array.isArray(messages) && messages.length > 0) {
+        messageEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    } catch (err) {
+      console.error("[Auto-scroll effect error]", err, { messages, messageEndRef });
+    }
+  }, [messages]);
+
+  // Show loading skeleton while messages are loading
+  if (isMessagesLoading) {
+    return (
+      <div className="flex-1 flex flex-col overflow-auto">
+        <ChatHeader />
+        <MessageSkeleton />
+        <MessageInput />
+      </div>
+    );
+  }
+
+
+  // Main chat UI layout with error boundaries and robust fallback
+  return (
+    <ErrorBoundary>
+      <div className="flex-1 flex flex-col overflow-auto">
+        {/* Chat header with error boundary */}
+        <ErrorBoundary>
+          <ChatHeader />
+        </ErrorBoundary>
+
+        {/* Message list with fallback for undefined/null state */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {renderedMessages || <div className="text-center text-zinc-400 py-8">No messages to display.</div>}
+        </div>
+
+        {/* Message input box with error boundary */}
+        <ErrorBoundary>
+          <MessageInput />
+        </ErrorBoundary>
+      </div>
+    </ErrorBoundary>
   );
 };
 export default ChatContainer;

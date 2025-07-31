@@ -1,6 +1,17 @@
 
+
 # Convo Chat App
 An instant messaging and social platform which allows communication through text messaging and media.
+
+---
+
+## 👨‍💻 Credits
+
+**Developed by:** [Mohamed Idriss Salhi](https://github.com/mohamedidrisssalhi)
+
+*building a modern, real-time chat experience.*
+
+---
 
 ## Project Planning
 this is how i planned and designed in preps
@@ -16,7 +27,8 @@ The following sketch illustrates the initial UI/UX design and feature planning f
 
 *This is the planned user interface, chat layout, login flow, and key features such as private chat, online/offline status, and chat room management.*
 
-Highlights:
+
+## Highlights
 
 - Tech stack: MERN + Socket.io + TailwindCSS + Daisy UI + Headless UI
 - Authentication && Authorization with JWT

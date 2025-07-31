@@ -8,7 +8,7 @@ import uploadToCloudinary from "../lib/cloudinary";
 
 const CreateRoomModal = ({ isOpen, onClose }) => {
   const { theme } = useThemeStore();
-  const { users, createChatRoom, getChatRooms, setSelectedRoom } = useChatStore();
+  const { users, createChatRoom, getChatRooms } = useChatStore();
   const { authUser } = useAuthStore();
   const [roomName, setRoomName] = useState("");
   const [selectedUsers, setSelectedUsers] = useState([authUser?._id]);
@@ -43,7 +43,7 @@ const CreateRoomModal = ({ isOpen, onClose }) => {
     if (avatar) {
       try {
         avatarUrl = await uploadToCloudinary(avatar);
-      } catch (err) {
+      } catch {
         setLoading(false);
         alert("Failed to upload avatar");
         return;

@@ -42,14 +42,11 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("room-members-updated", room ? room.members : []);
   });
 
-  // Leave a room
+  // Leave a room: only update socket room membership, do not emit DB state here
   socket.on("leave-room", async (roomId) => {
     if (roomSocketMap[roomId]) roomSocketMap[roomId].delete(socket.id);
     socket.leave(roomId);
-    // Fetch members from DB and emit
-    const { default: ChatRoom } = await import("../models/chatRoom.model.js");
-    const room = await ChatRoom.findById(roomId).populate("members", "_id fullName profilePic");
-    io.to(roomId).emit("room-members-updated", room ? room.members : []);
+    // Do not emit room-members-updated here; handled by API after DB update
   });
 
   socket.on("disconnect", async () => {
@@ -68,3 +65,7 @@ io.on("connection", (socket) => {
 });
 
 export { io, app, server };
+
+export function getIO() {
+  return io;
+}

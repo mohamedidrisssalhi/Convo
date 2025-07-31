@@ -1,56 +1,41 @@
-# Convo Chat App - Technical Specification
 
-## 1. Project Overview
-A full-stack real-time chat application with user authentication, chat rooms, and media messaging. Built with Node.js, Express, MongoDB, React, and Socket.IO.
+# Convo Chat App — Technical Specification
 
-## 2. Features by Phase
-
-### Phase 1: Project Setup & Database
-- Node.js/Express backend
-- MongoDB connection via Mongoose
-- Models: User, Message
-
-### Phase 2: User Authentication
-- JWT-based authentication
-- Password hashing with bcrypt
-- Auth routes: register, login, logout
-- Auth middleware to protect routes
-- React forms for login/register
-
-### Phase 3: Chat Room Management
-- Chat room model and routes (create, join, leave)
-- Backend logic for room membership
-- React form to create/join/leave rooms
-- Real-time user list per room
-
-### Phase 4: Real-Time Messaging
-- Socket.IO integration (server & client)
-- Message model for storing chat history
-- Backend logic for sending/receiving messages
-- React message interface (send/receive in real time)
-- Message timestamps and user indicators
-
-### Phase 5: UI & Styling
-- Modular React components (Navbar, Sidebar, ChatContainer, etc.)
-- Responsive design with TailwindCSS
-- User-friendly, mobile-ready interface
-
-### Phase 6: Deployment
-- Deployment to Netlify/Vercel (frontend) and Render/Heroku (backend)
-- Environment variable management
-- Production build and optimization
+## Overview
+Convo is a modern, full-stack real-time chat application featuring user authentication, chat rooms, and media messaging. Built with Node.js, Express, MongoDB, React, Zustand, and Socket.IO, it delivers a seamless, responsive, and scalable messaging experience.
 
 ---
 
-## 3. Technical Architecture
-- **Backend:** Node.js, Express, MongoDB (Mongoose), Socket.IO
-- **Frontend:** React, React Router, Zustand (state), TailwindCSS
-- **Authentication:** JWT, bcrypt, cookies
-- **Deployment:** Render backend and frontend
+## Features
+
+### Core
+- User registration, login, and logout (JWT-based authentication)
+- Secure password hashing (bcrypt)
+- Real-time chat rooms (create, join, leave)
+- Direct and group messaging
+- Media (image) messaging support
+- Real-time online user and room member lists
+- Responsive, mobile-ready UI (TailwindCSS)
+
+### Advanced
+- Modular React component architecture
+- State management with Zustand
+- Real-time updates via Socket.IO (messages, presence, room members)
+- Error handling and user feedback (toasts, status codes)
+- Production-ready deployment (Render, Netlify/Vercel)
 
 ---
 
-## 4. Data Models
+## Technical Architecture
+
+**Backend:** Node.js, Express, MongoDB (Mongoose), Socket.IO  
+**Frontend:** React, React Router, Zustand, TailwindCSS  
+**Authentication:** JWT (httpOnly cookies), bcrypt  
+**Deployment:** Render (backend), Netlify/Vercel (frontend)
+
+---
+
+## Data Models
 
 ### User
 ```js
@@ -80,13 +65,14 @@ A full-stack real-time chat application with user authentication, chat rooms, an
 {
   name: String, // required
   members: [ObjectId (User)],
+  avatar: String, // optional
   createdAt, updatedAt
 }
 ```
 
 ---
 
-## 5. API Endpoints
+## API Endpoints
 
 ### Auth
 - `POST /api/auth/register` — Register new user
@@ -105,24 +91,22 @@ A full-stack real-time chat application with user authentication, chat rooms, an
 
 ---
 
-## 6. Core Functions & Logic
-- **User registration:** Validates input, hashes password, stores user
+## Core Logic & Workflows
+
+- **Registration:** Validates input, hashes password, stores user
 - **Login:** Validates credentials, issues JWT, sets cookie
-- **Auth middleware:** Verifies JWT, attaches user to request
-- **Chat room creation/join/leave:** Updates room membership
-- **Real-time messaging:** Uses Socket.IO for instant updates
-- **Message storage:** Saves messages to MongoDB
+- **Auth Middleware:** Verifies JWT, attaches user to request
+- **Chat Room Management:** Create, join, leave; updates membership in DB and real time
+- **Real-Time Messaging:** Socket.IO for instant message delivery and presence
+- **Message Storage:** Persists all messages in MongoDB
 
 ---
 
-## 7. Error Handling
+## Error Handling & Security
+
 - All endpoints return clear error messages and status codes
 - Handles duplicate registration, invalid login, unauthorized access, etc.
 - Socket.IO errors handled on both client and server
-
----
-
-## 8. Performance & Security
 - Passwords hashed with bcrypt
 - JWTs stored in httpOnly cookies
 - CORS configured for frontend/backend
@@ -131,19 +115,22 @@ A full-stack real-time chat application with user authentication, chat rooms, an
 
 ---
 
-## 9. Testing & Future Enhancements
-- Unit and integration tests for backend routes (Jest/Supertest)
+## Testing & Future Enhancements
+
+- Unit/integration tests for backend (Jest/Supertest)
 - E2E tests for frontend (Cypress)
-- Future: media uploads, group DMs, notifications, admin panel
+- Future: media uploads, group DMs, notifications, admin panel, message reactions, file sharing
 
 ---
 
-## 10. File/Component Naming
-- All files and components are named to match project instructions and phases (see code comments for mapping)
+## File/Component Naming & Structure
+
+- Files and components are named for clarity and phase alignment (see code comments)
 - Example: `RegisterForm.jsx` (was `SignUpPage.jsx`), `chatRooms.js` (was `chatRoom.route.js`)
 
 ---
 
-## 11. Diagrams & References
+## References & Diagrams
+
 - See `README.md` for tech stack diagram and UI/UX sketches
 - For detailed code logic, see comments in each file

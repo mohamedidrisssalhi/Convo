@@ -82,6 +82,11 @@ const leaveRoom = async (req, res) => {
       (memberId) => memberId.toString() !== req.user._id.toString()
     );
     await room.save();
+    // Emit updated members to the room for real-time sync
+    const { getIO } = await import("../lib/socket.js");
+    const io = getIO();
+    const populatedRoom = await room.populate("members", "_id fullName profilePic");
+    io.to(roomId).emit("room-members-updated", populatedRoom.members);
     // Respond with confirmation
     res.json({ message: 'Left room' });
   } catch (err) {

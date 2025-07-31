@@ -1,10 +1,10 @@
 import express from 'express';
 import chatRoomController from '../controllers/chatRoom.controller.js';
-import protectRoute from '../middleware/auth.middleware.js';
+import passportAuth from '../middleware/passportAuth.middleware.js';
 
 const router = express.Router();
 // All routes require authentication
-router.use(protectRoute);
+router.use(passportAuth);
 // Create a new chat room
 router.post('/', chatRoomController.createRoom);
 // List all chat rooms

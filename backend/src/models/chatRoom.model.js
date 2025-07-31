@@ -31,6 +31,17 @@ const ChatRoomSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  // Last message timestamp for sorting
+  lastMessageAt: {
+    type: Date,
+    default: Date.now
+  },
+  // Unread message count per user (userId: count)
+  unreadCounts: {
+    type: Map,
+    of: Number,
+    default: {}
+  },
   // Room creation date
   createdAt: {
     type: Date,

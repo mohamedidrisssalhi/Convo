@@ -30,10 +30,20 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    // Hashed password (required for authentication, min 6 chars)
-    password: {
+    // Unique username (required for friend requests, login, etc.)
+    username: {
       type: String,
       required: true,
+      unique: true,
+      minlength: 3,
+      maxlength: 32,
+      match: /^[a-zA-Z0-9_]+$/,
+      trim: true,
+    },
+    // Hashed password (required for authentication, min 6 chars, optional for Google users)
+    password: {
+      type: String,
+      required: false,
       minlength: 6,
     },
     // Optional profile picture URL (can be empty)
@@ -41,6 +51,31 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Google account ID (for linked Google accounts)
+    googleId: {
+      type: String,
+      default: null,
+    },
+    // Google email (for linked Google accounts)
+    googleEmail: {
+      type: String,
+      default: null,
+    },
+    // Last message timestamp for DM sorting
+    lastMessageAt: {
+      type: Date,
+      default: Date.now,
+    },
+    // Unread message count per sender (senderId: count)
+    unreadCounts: {
+      type: Map,
+      of: Number,
+      default: {},
+    },
+    // Friends system
+    friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    incomingRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    sentRequests: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   },
   { timestamps: true } // Automatically adds createdAt and updatedAt fields
 );

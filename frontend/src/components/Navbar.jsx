@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../store/useAuthStore";
-import { LogOut, MessageSquare, Settings, User, Hash } from "lucide-react";
+import { LogOut, MessageSquare, Settings, User } from "lucide-react";
 import { useState } from "react";
 import CreateRoomModal from "./CreateRoomModal";
 

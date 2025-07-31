@@ -1,10 +1,11 @@
-
 // Sidebar component: displays contacts and chat rooms, allows switching between them
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
-import { Users } from "lucide-react";
+import FriendsList from "./FriendsList";
+import { Users, UserPlus, UserCheck, Search } from "lucide-react";
+import toast from "react-hot-toast";
 
 
 // Main Sidebar UI for contacts and chat rooms
@@ -20,138 +21,210 @@ const Sidebar = () => {
     selectedRoom,
     setSelectedRoom,
     joinChatRoom,
-    leaveChatRoom,
     isRoomsLoading,
   } = useChatStore();
-  const { onlineUsers, authUser } = useAuthStore();
+  // Track if this is the first load for skeleton
+  const isFirstLoad = useRef(true);
+  useEffect(() => {
+    if (!isUsersLoading && !isRoomsLoading) isFirstLoad.current = false;
+  }, [isUsersLoading, isRoomsLoading]);
 
-  // State for filtering contacts and managing group chat area
-  const [showOnlineOnly, setShowOnlineOnly] = useState(false); // Show only online contacts
+  // Messenger-style: Animate badge when unreadCount increases
+  const prevUnreadCounts = useRef({});
+  // ...all logic and hooks above...
+  // Main sidebar layout: friends and group chats
+  // ...existing code...
+
+
+  // Only fetch users and chat rooms on mount (first load)
+  useEffect(() => {
+    if (!users.length) getUsers();
+    if (!chatRooms.length) getChatRooms();
+    // After first load, all updates are socket-driven (see useChatStore.js)
+  }, []);
+
+  // Remove old onlineFriends/offlineFriends logic; now handled in FriendsList
+
+  // Add Friend modal state and logic
+  const [activePanel, setActivePanel] = useState(null); // 'add', 'search', 'requests', or null
+  const [friendSearch, setFriendSearch] = useState("");
+  const [friendInput, setFriendInput] = useState("");
+
+  // Zustand friends system state/actions
+  const {
+    friends,
+    incomingRequests,
+    getFriends,
+    getIncomingRequests,
+    sendFriendRequest,
+    acceptFriendRequest,
+    rejectFriendRequest,
+    removeFriend,
+    setIncomingRequests
+  } = useChatStore();
+
+  // UI state for add friend bar
+  const [friendRequestStatus, setFriendRequestStatus] = useState("");
+  const [friendRequestLoading, setFriendRequestLoading] = useState(false);
+
+  // State for managing group chats UI
   const [groupChatsCollapsed, setGroupChatsCollapsed] = useState(false); // Collapse/expand group chats
   const [groupChatsHeight, setGroupChatsHeight] = useState(160); // Height of group chat area (px)
   const [dragging, setDragging] = useState(false); // Drag state for resizing group chat area
 
-  // Keep collapse state and height in sync for group chats
-
-  // Keep collapse state and height in sync for group chats
+  // Fetch friends and requests on mount
   useEffect(() => {
-    if (groupChatsHeight <= 0 && !groupChatsCollapsed) {
-      setGroupChatsCollapsed(true);
-    } else if (groupChatsHeight > 0 && groupChatsCollapsed) {
-      setGroupChatsCollapsed(false);
+    getFriends();
+    getIncomingRequests();
+  }, []);
+
+  // Add friend handler
+  const handleSendFriendRequest = async (input) => {
+    setFriendRequestLoading(true);
+    setFriendRequestStatus("");
+    if (!input || input.length < 3) {
+      setFriendRequestStatus("Please enter a valid username.");
+      setFriendRequestLoading(false);
+      return;
     }
-  }, [groupChatsHeight, groupChatsCollapsed]);
-
-  // Mouse/touch drag handlers for group chats
-
-  // Handle mouse/touch drag for resizing group chat area
-  useEffect(() => {
-    if (!dragging) return;
-    const onMove = (e) => {
-      let clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const sidebarRect = document.getElementById('sidebar-groupchats')?.getBoundingClientRect();
-      if (!sidebarRect) return;
-      // Calculate new height based on mouse position from top of group chats area
-      let newHeight = sidebarRect.bottom - clientY;
-      // Clamp height: allow 0 (fully collapsed) up to 320px
-      newHeight = Math.max(0, Math.min(newHeight, 320));
-      setGroupChatsHeight(newHeight);
-    };
-    const onUp = () => setDragging(false);
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('touchmove', onMove);
-    window.addEventListener('mouseup', onUp);
-    window.addEventListener('touchend', onUp);
-    return () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('touchmove', onMove);
-      window.removeEventListener('mouseup', onUp);
-      window.removeEventListener('touchend', onUp);
-    };
-  }, [dragging]);
-
-
-  // Fetch users and chat rooms on mount
-  useEffect(() => {
-    getUsers();
-    getChatRooms();
-  }, [getUsers, getChatRooms]);
+    try {
+      await sendFriendRequest(input);
+      setFriendRequestStatus("Friend request sent!");
+      setFriendInput("");
+      getSentRequests();
+    } catch (e) {
+      setFriendRequestStatus("Failed to send friend request.");
+    }
+    setFriendRequestLoading(false);
+  };
+  // Accept/reject handlers
+  const handleAcceptRequest = async (user) => {
+    await acceptFriendRequest(user._id);
+    getFriends();
+    getIncomingRequests();
+  };
+  const handleRejectRequest = async (user) => {
+    // Optimistically remove from UI
+    const prevIncoming = [...safeIncomingRequests];
+    setIncomingRequests(safeIncomingRequests.filter(u => u._id !== user._id));
+    try {
+      await rejectFriendRequest(user._id);
+      getIncomingRequests();
+    } catch (e) {
+      setIncomingRequests(prevIncoming);
+      toast.error("Failed to reject request");
+    }
+  };
 
 
-  // Filter users based on online status if toggled
-  const filteredUsers = showOnlineOnly
-    ? users.filter((user) => onlineUsers.includes(user._id))
-    : users;
+  // Cancel sent friend request handler (pro version)
+  // handleCancelRequest removed: users can no longer cancel sent requests
 
+  // Defensive: ensure required data is present
+  const safeAuthUser = typeof authUser === 'object' && authUser !== null ? authUser : {};
+  const safeSelectedRoom = typeof selectedRoom === 'object' && selectedRoom !== null ? selectedRoom : {};
+  const safeChatRooms = Array.isArray(chatRooms) ? chatRooms : [];
+  const safeIncomingRequests = Array.isArray(incomingRequests) ? incomingRequests : [];
 
   // Show loading skeleton if users or rooms are loading
-  if (isUsersLoading || isRoomsLoading) return <SidebarSkeleton />;
+  if (isFirstLoad.current && (isUsersLoading || isRoomsLoading)) return <SidebarSkeleton />;
 
-
-  // Main sidebar layout: contacts and group chats
+  // Main sidebar layout: friends and group chats
   return (
     <aside className="h-full w-20 lg:w-72 border-r border-base-300 flex flex-col transition-all duration-200 relative bg-base-100">
-      {/* Contacts + Group Chats (blended, Steam-like) */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Contacts Section */}
+        {/* Friends Section */}
         <div className="border-b border-base-300 w-full p-5 pb-3">
           <div className="flex items-center gap-2">
             <Users className="size-6" />
-            <span className="font-medium hidden lg:block">Contacts</span>
-          </div>
-          <div className="mt-3 hidden lg:flex items-center gap-2">
-            <label className="cursor-pointer flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showOnlineOnly}
-                onChange={(e) => setShowOnlineOnly(e.target.checked)}
-                className="checkbox checkbox-sm"
-              />
-              <span className="text-sm">Show online only</span>
-            </label>
-            <span className="text-xs text-zinc-500">({onlineUsers.length - 1} online)</span>
+            <span className="font-medium hidden lg:block">Friends</span>
+            {/* Add a friend icon */}
+            <button
+              className="ml-2 relative group"
+              title="Add a friend"
+              onClick={() => setActivePanel(activePanel === 'add' ? null : 'add')}
+              type="button"
+            >
+              <UserPlus className="size-5 text-primary group-hover:scale-110 transition-transform" />
+            </button>
+            {/* Outgoing friend requests icon */}
+            <button
+              className="ml-1 relative group"
+              title="Pending Invites"
+              onClick={() => setActivePanel(activePanel === 'requests' ? null : 'requests')}
+              type="button"
+            >
+              <UserCheck className="size-5 text-primary group-hover:scale-110 transition-transform" />
+              {safeIncomingRequests.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">{safeIncomingRequests.length}</span>
+              )}
+            </button>
+            {/* Search friends icon */}
+            <button
+              className="ml-1 group"
+              title="Search Friends"
+              onClick={() => setActivePanel(activePanel === 'search' ? null : 'search')}
+              type="button"
+            >
+              <Search className="size-5 text-primary group-hover:scale-110 transition-transform" />
+            </button>
+            {/* Removed presence selector as requested */}
           </div>
         </div>
-        {/* List of contacts */}
-        <div className="overflow-y-auto w-full py-3 pr-1 flex-1">
-          {filteredUsers.map((user) => (
-            <button
-              key={user._id}
-              onClick={() => {
-                setSelectedUser(user); // This will also clear selectedRoom
-              }}
-              className={`
-                w-full p-3 flex items-center gap-3
-                hover:bg-base-300 transition-colors
-                ${selectedUser?._id === user._id ? "bg-base-300 ring-1 ring-base-300" : ""}
-              `}
-            >
-              {/* User avatar and online indicator */}
-              <div className="relative mx-auto lg:mx-0">
-                <img
-                  src={user.profilePic || "/avatar.png"}
-                  alt={user.name}
-                  className="size-12 object-cover rounded-full"
-                />
-                {onlineUsers.includes(user._id) && (
-                  <span
-                    className="absolute bottom-0 right-0 size-3 bg-green-500 
-                    rounded-full ring-2 ring-zinc-900"
-                  />
-                )}
-              </div>
-              {/* User name and status */}
-              <div className="hidden lg:block text-left min-w-0">
-                <div className="font-medium truncate">{user.fullName}</div>
-                <div className="text-sm text-zinc-400">
-                  {onlineUsers.includes(user._id) ? "Online" : "Offline"}
-                </div>
-              </div>
-            </button>
-          ))}
-          {filteredUsers.length === 0 && (
-            <div className="text-center text-zinc-500 py-4">No online users</div>
+        {/* Friends grouped by online/offline with expand/collapse and search/add/request panels */}
+        <div className="overflow-y-auto w-full py-3 pr-1 flex-1 transition-all duration-200">
+          {/* Add a friend bar */}
+          {activePanel === 'add' && (
+            <div className="mb-2 flex items-center gap-2 px-2">
+              <input
+                type="text"
+                className="input input-sm input-bordered flex-1"
+                placeholder="Enter username..."
+                value={friendInput}
+                onChange={e => setFriendInput(e.target.value)}
+                autoFocus
+              />
+              <button
+                className="btn btn-xs btn-primary"
+                onClick={() => handleSendFriendRequest(friendInput)}
+                disabled={friendRequestLoading}
+              >
+                {friendRequestLoading ? 'Adding...' : 'Add'}
+              </button>
+            </div>
           )}
+          {/* Friend search bar */}
+          {activePanel === 'search' && (
+            <div className="mb-2 flex items-center gap-2 px-2">
+              <input
+                type="text"
+                className="input input-sm input-bordered flex-1"
+                placeholder="Search friends..."
+                value={friendSearch}
+                onChange={e => setFriendSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+          )}
+
+          {activePanel === 'requests' && (
+            <div className="mb-2 px-2">
+              <div className="font-semibold text-sm mb-1">Incoming Requests <span className="text-xs text-zinc-400">({safeIncomingRequests.length})</span></div>
+              <ul className="space-y-1 mb-2">
+                {safeIncomingRequests.length === 0 && <li className="text-xs text-zinc-500">No incoming requests</li>}
+                {safeIncomingRequests.map(user => (
+                  <li key={user._id} className="flex items-center gap-2 p-2 rounded bg-base-200">
+                    <img src={user.profilePic || "/avatar.png"} alt={user.fullName} className="size-7 rounded-full" />
+                    <span className="flex-1 truncate">{user.fullName} <span className="text-xs text-zinc-400">@{user.username}</span></span>
+                    <button className="btn btn-xs btn-success" onClick={() => handleAcceptRequest(user)}>Accept</button>
+                    <button className="btn btn-xs btn-error" onClick={() => handleRejectRequest(user)}>Reject</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {/* Friends List (only mutually accepted friends) */}
+          <FriendsList friendSearch={friendSearch} selectedUser={selectedUser} setSelectedUser={setSelectedUser} />
         </div>
 
         {/* Group Chats (blended, collapsible, draggable) */}
@@ -208,15 +281,15 @@ const Sidebar = () => {
               className="overflow-y-auto custom-scrollbar"
               style={{ maxHeight: groupChatsHeight, minHeight: 0, transition: 'max-height 0.2s, min-height 0.2s' }}
             >
-              {chatRooms.length === 0 && (
+              {safeChatRooms.length === 0 && (
                 <div className="text-center text-zinc-500 py-4">No chat rooms</div>
               )}
-              {chatRooms.map((room) => {
-                const isMember = room.members.includes(authUser?._id);
+              {safeChatRooms.map((room) => {
+                const isMember = Array.isArray(room.members) && safeAuthUser?._id ? room.members.includes(safeAuthUser._id) : false;
                 return (
                   <div
                     key={room._id}
-                    className={`w-full flex items-center gap-3 hover:bg-base-300/80 transition-colors px-2 py-2 lg:px-3 lg:py-2 ${selectedRoom?._id === room._id ? "bg-base-300 ring-1 ring-primary/40" : ""}`}
+                    className={`w-full flex items-center gap-3 hover:bg-base-300/80 transition-colors px-2 py-2 lg:px-3 lg:py-2 ${safeSelectedRoom?._id === room._id ? "bg-base-300 ring-1 ring-primary/40" : ""}`}
                     style={{ borderBottom: '1px solid var(--tw-border-opacity, 0.1)' }}
                   >
                     <button
@@ -239,6 +312,10 @@ const Sidebar = () => {
                             {room.name?.replace(/[^a-zA-Z0-9]/g, '').slice(0,2) || 'GC'}
                           </span>
                         )}
+                        {/* Unread badge */}
+                        {room.unreadCount > 0 && (
+                          <span className="absolute -top-1 -right-1 rounded-full w-3 h-3 bg-red-500" />
+                        )}
                       </div>
                       {/* Room name - hidden on small screens, visible on lg+ */}
                       <div className="min-w-0 flex-1 text-left hidden lg:block">
@@ -252,7 +329,8 @@ const Sidebar = () => {
           )}
         </div>
       </div>
+
     </aside>
   );
-};
+}
 export default Sidebar;

@@ -1,7 +1,13 @@
+
 import { create } from "zustand";
 import { axiosInstance } from "../lib/axios.js";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
+
+// Notification sound for online/offline and message events
+const notificationAudio = typeof window !== 'undefined' ? new Audio('/notification.mp3') : null;
+
+// Only one BASE_URL and useAuthStore definition should exist
 
 const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:5001" : "/";
 
@@ -12,12 +18,14 @@ export const useAuthStore = create((set, get) => ({
   isUpdatingProfile: false,
   isCheckingAuth: true,
   onlineUsers: [],
+  lastOnlineUsers: [], // For detecting online/offline changes
+  presence: "online", // User presence: online, away, busy, offline
   socket: null,
 
   checkAuth: async () => {
     try {
-      const res = await axiosInstance.get("/auth/check");
-
+      // Always rely on httpOnly cookie for JWT
+      const res = await axiosInstance.get("/auth/check", { withCredentials: true });
       set({ authUser: res.data });
       get().connectSocket();
     } catch (error) {
@@ -68,6 +76,7 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+
   updateProfile: async (data) => {
     set({ isUpdatingProfile: true });
     try {
@@ -76,9 +85,18 @@ export const useAuthStore = create((set, get) => ({
       toast.success("Profile updated successfully");
     } catch (error) {
       console.log("error in update profile:", error);
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Failed to update profile");
     } finally {
       set({ isUpdatingProfile: false });
+    }
+  },
+
+  changePassword: async ({ oldPassword, newPassword }) => {
+    try {
+      await axiosInstance.post("/auth/change-password", { oldPassword, newPassword });
+      toast.success("Password changed successfully");
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Failed to change password");
     }
   },
 
@@ -92,12 +110,42 @@ export const useAuthStore = create((set, get) => ({
       },
     });
     socket.connect();
+    set({ socket });
+  },
 
-    set({ socket: socket });
+  // Call this in a React effect (e.g. in App.jsx) to guarantee listeners are always attached
+  bindSocketEvents: () => {
+    const { socket } = get();
+    if (!socket) return;
+    // Remove previous listeners to avoid duplicates
+    socket.off("getOnlineUsers");
+    socket.off("userProfileUpdated");
+    socket.off("presenceUpdate");
 
     socket.on("getOnlineUsers", (userIds) => {
-      set({ onlineUsers: userIds });
+      // Only update state, no toasts or notification sounds for online/offline events
+      set({ onlineUsers: userIds, lastOnlineUsers: userIds });
     });
+
+    socket.on("userProfileUpdated", (updatedUser) => {
+      if (get().authUser?._id === updatedUser._id) {
+        set({ authUser: { ...get().authUser, ...updatedUser } });
+      }
+    });
+
+    socket.on("presenceUpdate", ({ userId, presence }) => {
+      if (get().authUser?._id === userId) {
+        set({ presence });
+      }
+    });
+  },
+  // Set presence state (online, away, busy, offline)
+  setPresence: (presence) => {
+    set({ presence });
+    const { socket, authUser } = get();
+    if (socket && authUser) {
+      socket.emit("setPresence", { userId: authUser._id, presence });
+    }
   },
   disconnectSocket: () => {
     if (get().socket?.connected) get().socket.disconnect();
