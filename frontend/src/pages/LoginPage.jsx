@@ -119,7 +119,12 @@ const LoginPage = () => {
             <button
               type="button"
               className="btn btn-outline w-full flex items-center justify-center gap-2"
-              onClick={() => window.location.href = "http://localhost:5001/api/auth/google/login"}
+              onClick={() => {
+                const apiUrl = import.meta.env.VITE_API_URL || (import.meta.env.MODE === "development"
+                  ? "http://localhost:5001/api"
+                  : "/api");
+                window.location.href = `${apiUrl}/auth/google/login`;
+              }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24" height="24"><g><path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.23l6.87-6.87C36.13 2.36 30.45 0 24 0 14.82 0 6.73 5.48 2.69 13.44l8.06 6.26C12.5 13.13 17.77 9.5 24 9.5z"/><path fill="#34A853" d="M46.1 24.55c0-1.64-.15-3.22-.43-4.74H24v9.01h12.42c-.54 2.9-2.18 5.36-4.64 7.01l7.19 5.6C43.98 37.13 46.1 31.3 46.1 24.55z"/><path fill="#FBBC05" d="M10.75 28.7c-1.13-3.36-1.13-6.98 0-10.34l-8.06-6.26C.9 16.09 0 19.92 0 24c0 4.08.9 7.91 2.69 11.6l8.06-6.26z"/><path fill="#EA4335" d="M24 48c6.45 0 12.13-2.13 16.55-5.8l-7.19-5.6c-2.01 1.35-4.58 2.15-7.36 2.15-6.23 0-11.5-3.63-13.25-8.9l-8.06 6.26C6.73 42.52 14.82 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></g></svg>
               <span className="font-semibold">Sign in with Google</span>
