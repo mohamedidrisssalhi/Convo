@@ -25,7 +25,7 @@ router.get(
   (req, res) => {
     if (!req.user) {
       // No user found, redirect with nouser flag
-      return res.redirect("http://localhost:5173/login?nouser=1");
+      return res.redirect(`${process.env.FRONTEND_URL}/login?nouser=1`);
     }
     const token = jwt.sign({ id: req.user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
     // Set JWT as httpOnly cookie
@@ -36,9 +36,9 @@ router.get(
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
     if (req.user.needsProfileSetup) {
-      res.redirect(`http://localhost:5173/profile?setup=1`);
+      res.redirect(`${process.env.FRONTEND_URL}/profile?setup=1`);
     } else {
-      res.redirect(`http://localhost:5173`);
+      res.redirect(`${process.env.FRONTEND_URL}`);
     }
   }
 );
@@ -46,10 +46,10 @@ router.get(
 // Google OAuth callback for linking
 router.get(
   "/link/callback",
-  passport.authenticate("google-link", { failureRedirect: "http://localhost:5173/profile?error=google", session: false }),
+  passport.authenticate("google-link", { failureRedirect: `${process.env.FRONTEND_URL}/profile?error=google`, session: false }),
   async (req, res) => {
     if (!req.user) {
-      return res.redirect("http://localhost:5173/profile/link-error");
+      return res.redirect(`${process.env.FRONTEND_URL}/profile/link-error`);
     }
     // Issue a new JWT and set as httpOnly cookie (refreshes session)
     const token = jwt.sign({ id: req.user._id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -59,7 +59,7 @@ router.get(
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    res.redirect("http://localhost:5173/profile?linked=1");
+    res.redirect(`${process.env.FRONTEND_URL}/profile?linked=1`);
   }
 );
 
