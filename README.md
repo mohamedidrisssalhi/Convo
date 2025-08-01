@@ -3,6 +3,8 @@
 # Convo Chat App
 An instant messaging and social platform which allows communication through text messaging and media.
 
+[![Deploy on Render](https://img.shields.io/badge/Deployed%20on-Render-46b1e6?logo=render&logoColor=white)](https://your-render-app-url.onrender.com)
+
 ## Project Planning
 this is how i planned and designed in preps
 
